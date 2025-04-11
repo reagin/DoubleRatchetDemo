@@ -6,13 +6,12 @@ import (
 	"github.com/reagin/double_ratchet/chat"
 )
 
-var port = flag.String("port", "", "Listen Port")
-var mode = flag.String("mode", "", "Running Mode <client/server>")
+var port = flag.String("port", "", "Server Listen Port")
 
 func init() {
 	flag.Parse()
 }
 
 func main() {
-	chat.StartDoubleRatchet(*port, *mode)
+	chat.StartDoubleRatchet(*port)
 }

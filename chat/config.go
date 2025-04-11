@@ -2,18 +2,26 @@ package chat
 
 import "github.com/reagin/double_ratchet/core"
 
+const (
+	FileType = iota
+	TextType
+	ClientMode
+	ServerMode
+)
+
 var (
 	localAddress  string
 	remoteAddress string
+	sendChannel   chan []byte
+	recvChannel   chan []byte
 )
 
 var client *core.Client
 var server *core.Server
 var dataList []*Message
-var isChange = make(chan bool)
 
-const FileType = 0
-const TextType = 1
+var runMode = ServerMode
+var isChange = make(chan bool)
 
 type Message struct {
 	Type    int

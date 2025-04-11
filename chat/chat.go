@@ -15,7 +15,7 @@ import (
 	"github.com/reagin/double_ratchet/core"
 )
 
-func StartDoubleRatchet(port, mode string) {
+func StartDoubleRatchet(port string) {
 	myApp := app.NewWithID("com.github.reagin.double_ratchet")
 	myWindow := myApp.NewWindow("DoubleRatchet")
 	myWindow.Resize(fyne.NewSize(860, 550))
@@ -78,12 +78,7 @@ func StartDoubleRatchet(port, mode string) {
 			fileMessageBytes, _ := json.Marshal(fileMessage)
 			message := &Message{FileType, false, fileMessageBytes}
 			messageBytes, _ := json.Marshal(message)
-			switch mode {
-			case "server":
-				server.SendChannel <- messageBytes
-			case "client":
-				client.SendChannel <- messageBytes
-			}
+			sendChannel <- messageBytes
 
 			chatInfor := &Message{FileType, true, []byte("Send File: " + fileName)}
 			dataList = append(dataList, chatInfor)
@@ -98,12 +93,7 @@ func StartDoubleRatchet(port, mode string) {
 			// 发送给对方的信息
 			message := &Message{TextType, false, content}
 			messageBytes, _ := json.Marshal(message)
-			switch mode {
-			case "server":
-				server.SendChannel <- messageBytes
-			case "client":
-				client.SendChannel <- messageBytes
-			}
+			sendChannel <- messageBytes
 
 			chatInfor := &Message{TextType, true, content}
 			dataList = append(dataList, chatInfor)
@@ -128,6 +118,11 @@ func StartDoubleRatchet(port, mode string) {
 					if remoteEntry.Text == remoteAddress {
 						return
 					}
+					if remoteAddress != "" && remoteEntry.Text == "" {
+						runMode = ServerMode
+					} else {
+						runMode = ClientMode
+					}
 					remoteAddress = remoteEntry.Text
 					isChange <- true
 				}
@@ -140,38 +135,35 @@ func StartDoubleRatchet(port, mode string) {
 	})
 	var buttonContainer *fyne.Container
 	var buttonLayout = layout.NewGridWrapLayout(fyne.NewSize(140, 50))
-	switch mode {
-	case "client":
-		buttonContainer = container.New(buttonLayout, fileButton, sendButton, settingButton)
-	case "server":
-		buttonContainer = container.New(buttonLayout, fileButton, sendButton)
-	default:
-		log.Fatalln("❌ 请使用<client/server>模式运行")
-	}
+	// 设置按钮容器
+	buttonContainer = container.New(buttonLayout, fileButton, sendButton, settingButton)
 	// 设置底部容器
 	bottomContainer := container.NewBorder(nil, nil, nil, buttonContainer, input)
 	// 设置主界面容器
 	mainContainer := container.NewBorder(nil, bottomContainer, nil, nil, chatContainer)
 
-	// 初始化客户端和服务端
 	localAddress = "127.0.0.1:" + port
-	client = core.NewClient(localAddress, remoteAddress)
 	server = core.NewServer(localAddress)
+	client = core.NewClient(localAddress, remoteAddress)
 
+	// 启动协程更新状态
 	go func() {
-		switch mode {
-		case "client":
-			for {
-				<-isChange
-				if remoteAddress == "" {
-					continue
-				}
+		for {
+			switch runMode {
+			case ClientMode:
 				client = core.NewClient(localAddress, remoteAddress)
+				sendChannel = client.SendChannel
+				recvChannel = client.RecvChannel
 				go client.StartClient()
+			case ServerMode:
+				server = core.NewServer(localAddress)
+				sendChannel = server.SendChannel
+				recvChannel = server.RecvChannel
+				go server.StartServer()
 			}
-		case "server":
-			server = core.NewServer(localAddress)
-			go server.StartServer()
+			<-isChange
+			dataList = dataList[:0]
+			chatList.Refresh()
 		}
 	}()
 
@@ -182,8 +174,7 @@ func StartDoubleRatchet(port, mode string) {
 		for {
 			var messageBytes []byte
 			select {
-			case messageBytes = <-server.RecvChannel:
-			case messageBytes = <-client.RecvChannel:
+			case messageBytes = <-recvChannel:
 			default:
 				continue // 如果没有新消息，继续循环
 			}
