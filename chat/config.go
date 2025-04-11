@@ -10,7 +10,10 @@ const (
 )
 
 var (
+	localPort     string
+	remotePort    string
 	localAddress  string
+	listenAddress string
 	remoteAddress string
 	sendChannel   chan []byte
 	recvChannel   chan []byte

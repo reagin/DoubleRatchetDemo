@@ -15,7 +15,16 @@ import (
 	"github.com/reagin/double_ratchet/core"
 )
 
-func StartDoubleRatchet(port string) {
+func init() {
+	localPort = "9090"
+	remotePort = "8080"
+	localAddress = "127.0.0.1:" + localPort
+	listenAddress = "0.0.0.0:" + localPort
+	server = core.NewServer(listenAddress)
+	client = core.NewClient(localAddress, remoteAddress+":"+remotePort)
+}
+
+func StartDoubleRatchet() {
 	myApp := app.NewWithID("com.github.reagin.double_ratchet")
 	myWindow := myApp.NewWindow("DoubleRatchet")
 	myWindow.Resize(fyne.NewSize(860, 550))
@@ -142,21 +151,17 @@ func StartDoubleRatchet(port string) {
 	// 设置主界面容器
 	mainContainer := container.NewBorder(nil, bottomContainer, nil, nil, chatContainer)
 
-	localAddress = "127.0.0.1:" + port
-	server = core.NewServer(localAddress)
-	client = core.NewClient(localAddress, remoteAddress)
-
 	// 启动协程更新状态
 	go func() {
 		for {
 			switch runMode {
 			case ClientMode:
-				client = core.NewClient(localAddress, remoteAddress)
+				client = core.NewClient(localAddress, remoteAddress+":"+remotePort)
 				sendChannel = client.SendChannel
 				recvChannel = client.RecvChannel
 				go client.StartClient()
 			case ServerMode:
-				server = core.NewServer(localAddress)
+				server = core.NewServer(listenAddress)
 				sendChannel = server.SendChannel
 				recvChannel = server.RecvChannel
 				go server.StartServer()
